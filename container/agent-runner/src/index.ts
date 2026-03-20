@@ -107,9 +107,14 @@ async function readStdin(): Promise<string> {
 const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
 const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
 
+let activePrefix = '';
+
 function writeOutput(output: ContainerOutput): void {
+  const prefixed = activePrefix && output.result
+    ? { ...output, result: `${activePrefix}${output.result}` }
+    : output;
   console.log(OUTPUT_START_MARKER);
-  console.log(JSON.stringify(output));
+  console.log(JSON.stringify(prefixed));
   console.log(OUTPUT_END_MARKER);
 }
 
@@ -257,6 +262,79 @@ function formatTranscriptMarkdown(messages: ParsedMessage[], title?: string | nu
 
   return lines.join('\n');
 }
+
+// ── Ollama settings & commands ────────────────────────────────────────────────
+
+const OLLAMA_SETTINGS_FILE = '/workspace/group/ollama-settings.json';
+
+interface OllamaSettings {
+  think: boolean;
+}
+
+function loadOllamaSettings(): OllamaSettings {
+  try {
+    if (fs.existsSync(OLLAMA_SETTINGS_FILE)) {
+      return JSON.parse(fs.readFileSync(OLLAMA_SETTINGS_FILE, 'utf-8')) as OllamaSettings;
+    }
+  } catch { /* ignore corrupt file */ }
+  return { think: true };
+}
+
+function saveOllamaSettings(settings: OllamaSettings): void {
+  fs.writeFileSync(OLLAMA_SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
+
+/**
+ * Handle Ollama slash commands (/think, /thinkstatus).
+ * Returns a reply string if it was a command, null otherwise.
+ */
+function handleOllamaCommand(text: string): string | null {
+  const trimmed = text.trim();
+  if (/^\/think$/i.test(trimmed)) {
+    const settings = loadOllamaSettings();
+    settings.think = !settings.think;
+    saveOllamaSettings(settings);
+    return `Ollama think mode: **${settings.think ? 'think' : 'nothink'}**`;
+  }
+  if (/^\/thinkstatus$/i.test(trimmed)) {
+    const settings = loadOllamaSettings();
+    return `Ollama think mode: **${settings.think ? 'think' : 'nothink'}**`;
+  }
+  return null;
+}
+
+// ── Ollama routing helpers ────────────────────────────────────────────────────
+
+/** Extract the text content of the last <message> tag in the XML prompt */
+function extractLastUserMessage(prompt: string): string {
+  const matches = [...prompt.matchAll(/<message\b[^>]*>([\s\S]*?)<\/message>/g)];
+  return matches.length > 0 ? matches[matches.length - 1][1].trim() : prompt.trim();
+}
+
+/**
+ * Format the XML prompt into a clean conversation string for Ollama.
+ * Multiple messages are joined as "Sender: text" lines.
+ */
+function formatPromptForOllama(prompt: string): string {
+  const matches = [...prompt.matchAll(/<message\s+sender="([^"]*)"[^>]*>([\s\S]*?)<\/message>/g)];
+  if (matches.length === 0) return prompt;
+  if (matches.length === 1) return matches[0][2].trim();
+  return matches.map(m => `${m[1]}: ${m[2].trim()}`).join('\n\n');
+}
+
+/**
+ * Strip the !claude or /claude prefix from the last <message> element so Claude
+ * receives the intended query rather than the literal "!claude ..." text.
+ */
+function stripClaudePrefix(prompt: string): string {
+  const lastTagIdx = prompt.lastIndexOf('<message');
+  if (lastTagIdx === -1) return prompt;
+  const before  = prompt.slice(0, lastTagIdx);
+  const lastTag = prompt.slice(lastTagIdx);
+  return before + lastTag.replace(/^(<message[^>]*>)[!/]claude\s*/i, '$1');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * Check for _close sentinel.
@@ -510,6 +588,45 @@ async function main(): Promise<void> {
     prompt += '\n' + pending.join('\n');
   }
 
+  // ── Ollama / Claude routing ───────────────────────────────────────────────
+  // Scheduled tasks always go to Claude (they may need file access, Bash, etc.)
+  if (!containerInput.isScheduledTask) {
+    const lastMsg       = extractLastUserMessage(prompt);
+    const claudeOverride = /^[!/]claude\b/i.test(lastMsg);
+
+    if (!claudeOverride) {
+      const cmdReply = handleOllamaCommand(lastMsg);
+      if (cmdReply !== null) {
+        writeOutput({ status: 'success', result: cmdReply });
+        return;
+      }
+
+      log('Routing to Ollama (default)');
+      activePrefix = '🤖 **Ollama:**\n';
+      try {
+        const { runOllamaAgent } = await import('./ollama-agent.js');
+        const ollamaPrompt = formatPromptForOllama(prompt);
+        const answer = await runOllamaAgent(ollamaPrompt, mcpServerPath, {
+          chatJid:     containerInput.chatJid,
+          groupFolder: containerInput.groupFolder,
+          isMain:      containerInput.isMain,
+        });
+        writeOutput({ status: 'success', result: answer || null });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log(`Ollama error: ${msg}`);
+        writeOutput({ status: 'error', result: null, error: `Ollama failed: ${msg}` });
+      }
+      return;
+    }
+
+    // !claude / /claude override: strip prefix so Claude sees the real query
+    log('Routing to Claude (!claude / /claude override detected)');
+    activePrefix = '🧠 **Claude:**\n';
+    prompt = stripClaudePrefix(prompt);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Query loop: run query → wait for IPC message → run new query → repeat
   let resumeAt: string | undefined;
   try {
@@ -545,7 +662,46 @@ async function main(): Promise<void> {
       }
 
       log(`Got new message (${nextMessage.length} chars), starting new query`);
-      prompt = nextMessage;
+
+      // ── Re-apply Ollama / Claude routing for each IPC message ─────────────
+      {
+        const lastMsg2      = extractLastUserMessage(nextMessage);
+        const claudeOverride2 = /^[!/]claude\b/i.test(lastMsg2);
+
+        if (!claudeOverride2) {
+          const cmdReply2 = handleOllamaCommand(lastMsg2);
+          if (cmdReply2 !== null) {
+            writeOutput({ status: 'success', result: cmdReply2, newSessionId: sessionId });
+          } else {
+            log('IPC message: routing to Ollama');
+            activePrefix = '🤖 **Ollama:**\n';
+            try {
+              const { runOllamaAgent } = await import('./ollama-agent.js');
+              const ollamaPrompt = formatPromptForOllama(nextMessage);
+              const answer = await runOllamaAgent(ollamaPrompt, mcpServerPath, {
+                chatJid:     containerInput.chatJid,
+                groupFolder: containerInput.groupFolder,
+                isMain:      containerInput.isMain,
+              });
+              writeOutput({ status: 'success', result: answer || null, newSessionId: sessionId });
+            } catch (err2) {
+              const msg2 = err2 instanceof Error ? err2.message : String(err2);
+              log(`Ollama IPC error: ${msg2}`);
+              writeOutput({ status: 'error', result: null, newSessionId: sessionId, error: `Ollama failed: ${msg2}` });
+            }
+          }
+          // Wait for next IPC message instead of running Claude
+          const nextMessage2 = await waitForIpcMessage();
+          if (nextMessage2 === null) { log('Close sentinel received, exiting'); break; }
+          prompt = nextMessage2;
+          continue;
+        }
+
+        log('IPC message: routing to Claude (/claude override)');
+        activePrefix = '🧠 **Claude:**\n';
+        prompt = stripClaudePrefix(nextMessage);
+      }
+      // ─────────────────────────────────────────────────────────────────────
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
