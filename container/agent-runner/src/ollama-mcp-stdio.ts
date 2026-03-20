@@ -12,6 +12,7 @@ import fs from 'fs';
 import path from 'path';
 
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://host.docker.internal:11434';
+const OLLAMA_KEEP_ALIVE = process.env.OLLAMA_KEEP_ALIVE ?? '-1';
 const OLLAMA_STATUS_FILE = '/workspace/ipc/ollama_status.json';
 
 function log(msg: string): void {
@@ -101,6 +102,7 @@ server.tool(
         model: args.model,
         prompt: args.prompt,
         stream: false,
+        keep_alive: OLLAMA_KEEP_ALIVE,
       };
       if (args.system) {
         body.system = args.system;
