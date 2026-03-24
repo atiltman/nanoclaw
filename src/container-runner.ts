@@ -222,9 +222,12 @@ function buildContainerArgs(
   args.push('-e', `TZ=${TIMEZONE}`);
 
   // Pass Ollama configuration through so ollama-agent.ts can pick them up
-  if (process.env.OLLAMA_HOST)       args.push('-e', `OLLAMA_HOST=${process.env.OLLAMA_HOST}`);
-  if (process.env.OLLAMA_MODEL)      args.push('-e', `OLLAMA_MODEL=${process.env.OLLAMA_MODEL}`);
-  if (process.env.OLLAMA_KEEP_ALIVE) args.push('-e', `OLLAMA_KEEP_ALIVE=${process.env.OLLAMA_KEEP_ALIVE}`);
+  if (process.env.OLLAMA_HOST)
+    args.push('-e', `OLLAMA_HOST=${process.env.OLLAMA_HOST}`);
+  if (process.env.OLLAMA_MODEL)
+    args.push('-e', `OLLAMA_MODEL=${process.env.OLLAMA_MODEL}`);
+  if (process.env.OLLAMA_KEEP_ALIVE)
+    args.push('-e', `OLLAMA_KEEP_ALIVE=${process.env.OLLAMA_KEEP_ALIVE}`);
 
   // Route API traffic through the credential proxy (containers never see real secrets)
   args.push(

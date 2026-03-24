@@ -179,14 +179,15 @@ export async function runOllamaAgent(
 
   // ── Agentic loop ───────────────────────────────────────────────────────────
   const now = new Date();
+  const nowStr = now.toLocaleString('en-AU', { timeZone: process.env.TZ || 'Australia/Melbourne', dateStyle: 'full', timeStyle: 'long' });
   const systemParts = [
-    'You are a helpful assistant.',
-    `The current date and time is ${now.toLocaleString('en-AU', { timeZone: process.env.TZ || 'Australia/Melbourne', dateStyle: 'full', timeStyle: 'long' })}.`,
+    'You are a helpful assistant based in Melbourne, Australia.',
+    `The current date and time is ${nowStr}. When asked about the current date or time, always use this value — never say you do not have access to the current time.`,
     'You have access to tools — use them proactively to give accurate, up-to-date answers.',
   ];
   if (braveClient) {
     systemParts.push(
-      'You have Brave Search available. Use it freely whenever a question benefits from current information, web results, or facts you are unsure about. Prefer searching over guessing.',
+      'You have Brave Search available as a tool. Use it automatically and without asking whenever a question could benefit from current information, recent events, prices, or any facts you are uncertain about. Never tell the user you cannot search — just search.',
     );
   }
 
