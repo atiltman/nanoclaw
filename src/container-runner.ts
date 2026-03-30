@@ -14,6 +14,7 @@ import {
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
+  OLLAMA_ADMIN_TOOLS,
   TIMEZONE,
 } from './config.js';
 import { resolveGroupFolderPath, resolveGroupIpcPath } from './group-folder.js';
@@ -239,6 +240,11 @@ async function buildContainerArgs(
     args.push('-e', `OLLAMA_MODEL=${process.env.OLLAMA_MODEL}`);
   if (process.env.OLLAMA_KEEP_ALIVE)
     args.push('-e', `OLLAMA_KEEP_ALIVE=${process.env.OLLAMA_KEEP_ALIVE}`);
+
+  // Forward Ollama admin tools flag if enabled
+  if (OLLAMA_ADMIN_TOOLS) {
+    args.push('-e', 'OLLAMA_ADMIN_TOOLS=true');
+  }
 
   // Route API traffic through the credential proxy (containers never see real secrets)
   args.push(
