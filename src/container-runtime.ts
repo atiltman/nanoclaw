@@ -11,12 +11,12 @@ import { logger } from './logger.js';
 /** The container runtime binary name. */
 export const CONTAINER_RUNTIME_BIN = 'docker';
 
-/** Hostname inside containers that resolves to the Docker host. */
+/** Hostname containers use to reach the host machine. */
 export const CONTAINER_HOST_GATEWAY = 'host.docker.internal';
 
 /**
- * The host address to bind the credential proxy to.
- * macOS/WSL: loopback (Docker Desktop routes host.docker.internal via VM).
+ * Address the credential proxy binds to.
+ * Docker Desktop (macOS): 127.0.0.1 — the VM routes host.docker.internal to loopback.
  * Docker (Linux): bind to the docker0 bridge IP so only containers can reach it,
  *   falling back to 0.0.0.0 if the interface isn't found.
  */

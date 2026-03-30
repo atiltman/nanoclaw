@@ -527,7 +527,6 @@ async function main(): Promise<void> {
   initDatabase();
   logger.info('Database initialized');
   loadState();
-
   restoreRemoteControl();
 
   // Start credential proxy (containers route API calls through this)

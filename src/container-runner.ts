@@ -79,7 +79,7 @@ function buildVolumeMounts(
     });
 
     // Shadow .env so the agent cannot read secrets from the mounted project root.
-    // Credentials are injected by the OneCLI gateway, never exposed to containers.
+    // Credentials are injected by the credential proxy, never exposed to containers.
     const envFile = path.join(projectRoot, '.env');
     if (fs.existsSync(envFile)) {
       mounts.push({
@@ -223,11 +223,10 @@ function buildVolumeMounts(
   return mounts;
 }
 
-async function buildContainerArgs(
+function buildContainerArgs(
   mounts: VolumeMount[],
   containerName: string,
-  agentIdentifier?: string,
-): Promise<string[]> {
+): string[] {
   const args: string[] = ['run', '-i', '--rm', '--name', containerName];
 
   // Pass host timezone so container's local time matches the user's
@@ -246,6 +245,7 @@ async function buildContainerArgs(
     args.push('-e', 'OLLAMA_ADMIN_TOOLS=true');
   }
 
+
   // Route API traffic through the credential proxy (containers never see real secrets)
   args.push(
     '-e',
@@ -259,6 +259,8 @@ async function buildContainerArgs(
   const authMode = detectAuthMode();
   if (authMode === 'api-key') {
     args.push('-e', 'ANTHROPIC_API_KEY=placeholder');
+  } else {
+    args.push('-e', 'CLAUDE_CODE_OAUTH_TOKEN=placeholder');
   }
 
   // Runtime-specific args for host gateway resolution
@@ -301,15 +303,7 @@ export async function runContainerAgent(
   const mounts = buildVolumeMounts(group, input.isMain);
   const safeName = group.folder.replace(/[^a-zA-Z0-9-]/g, '-');
   const containerName = `nanoclaw-${safeName}-${Date.now()}`;
-  // Main group uses the default OneCLI agent; others use their own agent.
-  const agentIdentifier = input.isMain
-    ? undefined
-    : group.folder.toLowerCase().replace(/_/g, '-');
-  const containerArgs = await buildContainerArgs(
-    mounts,
-    containerName,
-    agentIdentifier,
-  );
+  const containerArgs = buildContainerArgs(mounts, containerName);
 
   logger.debug(
     {
