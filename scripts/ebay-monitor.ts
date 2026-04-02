@@ -61,6 +61,7 @@ interface Listing {
   isTi: boolean;
   sellerFeedback: string; // e.g. "100% positive (115)"
   isTrustedSeller: boolean; // ≥95% positive with >50 ratings
+  isSketchySeller: boolean; // 0% positive or 0 ratings
   url: string;
 }
 
@@ -119,8 +120,10 @@ function parseListings(html: string): Listing[] {
       feedbackCount !== null &&
       feedbackPct >= 95 &&
       feedbackCount > 50;
+    const isSketchySeller =
+      feedbackPct === 0 || feedbackCount === 0;
 
-    listings.push({ id, title, price, priceValue, isTi, sellerFeedback, isTrustedSeller, url });
+    listings.push({ id, title, price, priceValue, isTi, sellerFeedback, isTrustedSeller, isSketchySeller, url });
   }
 
   return listings;
@@ -250,9 +253,11 @@ async function main(): Promise<void> {
         : '';
 
       const feedbackLine = listing.sellerFeedback
-        ? allGood
-          ? `💵 Seller: ${listing.sellerFeedback}`
-          : `Seller: ${listing.sellerFeedback}`
+        ? listing.isSketchySeller
+          ? `⚠️ Seller: ${listing.sellerFeedback}`
+          : allGood
+            ? `💵 Seller: ${listing.sellerFeedback}`
+            : `Seller: ${listing.sellerFeedback}`
         : '';
 
       const msg = [titleLine, priceLine, feedbackLine, listing.url]
