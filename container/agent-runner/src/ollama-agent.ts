@@ -198,7 +198,7 @@ export async function runOllamaAgent(
   const messages: OllamaMessage[] = [
     { role: 'system', content: systemParts.join(' ') },
     ...history,
-    { role: 'user', content: userText },
+    { role: 'user', content: `[${nowStr}] ${userText}` },
   ];
   let finalAnswer = '';
 
