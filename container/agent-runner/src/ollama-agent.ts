@@ -187,7 +187,7 @@ export async function runOllamaAgent(
   ];
   if (braveClient) {
     systemParts.push(
-      'You have Brave Search available as a tool. Use it automatically and without asking whenever a question could benefit from current information, recent events, prices, or any facts you are uncertain about. Never tell the user you cannot search — just search.',
+      'You have Brave Search available as a tool. Use it automatically and without asking whenever a question could benefit from current information, recent events, prices, or any facts you are uncertain about. Never tell the user you cannot search — just search. IMPORTANT: Do NOT say "I will search" or "I\'ll look that up" or announce any intention — emit the tool call directly as your first action. Never describe what you are about to do; just do it.',
     );
   }
 

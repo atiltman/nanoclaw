@@ -245,7 +245,6 @@ function buildContainerArgs(
     args.push('-e', 'OLLAMA_ADMIN_TOOLS=true');
   }
 
-
   // Route API traffic through the credential proxy (containers never see real secrets)
   args.push(
     '-e',
