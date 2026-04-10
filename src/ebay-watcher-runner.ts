@@ -49,12 +49,16 @@ function parseListings(html: string, filterAustralia: boolean): Listing[] {
     const title = titleMatch ? titleMatch[1].trim() : 'Unknown';
 
     if (filterAustralia) {
-      const locationMatch = block.match(/su-styled-text secondary large">from ([^<]+)<\/span>/);
+      const locationMatch = block.match(
+        /su-styled-text secondary large">from ([^<]+)<\/span>/,
+      );
       const location = locationMatch ? locationMatch[1].trim() : '';
       if (location && location !== 'Australia') continue;
     }
 
-    const priceMatch = block.match(/s-card__price">(AU \$[\d,]+\.?\d*)<\/span>/);
+    const priceMatch = block.match(
+      /s-card__price">(AU \$[\d,]+\.?\d*)<\/span>/,
+    );
     const price = priceMatch ? priceMatch[1] : '';
     const priceValue = price ? parseFloat(price.replace(/[^0-9.]/g, '')) : null;
 
@@ -66,7 +70,17 @@ function parseListings(html: string, filterAustralia: boolean): Listing[] {
       : '';
     const isSketchySeller = feedbackPct === 0 || feedbackCount === 0;
 
-    listings.push({ id, title, price, priceValue, sellerFeedback, feedbackPct, feedbackCount, isSketchySeller, url });
+    listings.push({
+      id,
+      title,
+      price,
+      priceValue,
+      sellerFeedback,
+      feedbackPct,
+      feedbackCount,
+      isSketchySeller,
+      url,
+    });
   }
 
   return listings;
@@ -74,10 +88,18 @@ function parseListings(html: string, filterAustralia: boolean): Listing[] {
 
 // ── Discord REST helpers ───────────────────────────────────────────────────────
 
-async function discordRequest(token: string, method: string, path: string, body?: object): Promise<unknown> {
+async function discordRequest(
+  token: string,
+  method: string,
+  path: string,
+  body?: object,
+): Promise<unknown> {
   const res = await fetch(`https://discord.com/api/v10${path}`, {
     method,
-    headers: { Authorization: `Bot ${token}`, 'Content-Type': 'application/json' },
+    headers: {
+      Authorization: `Bot ${token}`,
+      'Content-Type': 'application/json',
+    },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
@@ -93,18 +115,30 @@ async function resolveThread(token: string, watch: EbayWatch): Promise<string> {
 
   const channelId = watch.chat_jid.replace('dc:', '');
   const name = `eBay: ${watch.keywords.slice(0, 80)}`;
-  const thread = await discordRequest(token, 'POST', `/channels/${channelId}/threads`, {
-    name,
-    type: 11, // PUBLIC_THREAD
-    auto_archive_duration: 10080,
-  }) as { id: string };
+  const thread = (await discordRequest(
+    token,
+    'POST',
+    `/channels/${channelId}/threads`,
+    {
+      name,
+      type: 11, // PUBLIC_THREAD
+      auto_archive_duration: 10080,
+    },
+  )) as { id: string };
 
   setThread(watch.id, watch.chat_jid, thread.id);
-  logger.info({ watchId: watch.id, threadId: thread.id }, 'eBay watch thread created');
+  logger.info(
+    { watchId: watch.id, threadId: thread.id },
+    'eBay watch thread created',
+  );
   return thread.id;
 }
 
-async function sendToThread(token: string, threadId: string, content: string): Promise<void> {
+async function sendToThread(
+  token: string,
+  threadId: string,
+  content: string,
+): Promise<void> {
   const MAX = 2000;
   for (let i = 0; i < content.length; i += MAX) {
     await discordRequest(token, 'POST', `/channels/${threadId}/messages`, {
@@ -113,9 +147,15 @@ async function sendToThread(token: string, threadId: string, content: string): P
   }
 }
 
-async function sendDm(token: string, userId: string, content: string): Promise<void> {
+async function sendDm(
+  token: string,
+  userId: string,
+  content: string,
+): Promise<void> {
   try {
-    const dm = await discordRequest(token, 'POST', `/users/@me/channels`, { recipient_id: userId }) as { id: string };
+    const dm = (await discordRequest(token, 'POST', `/users/@me/channels`, {
+      recipient_id: userId,
+    })) as { id: string };
     await sendToThread(token, dm.id, content);
   } catch (err) {
     logger.warn({ err, userId }, 'Failed to send eBay watcher DM');
@@ -125,17 +165,23 @@ async function sendDm(token: string, userId: string, content: string): Promise<v
 // ── Listing filter ─────────────────────────────────────────────────────────────
 
 function meetsSellerCriteria(listing: Listing, watch: EbayWatch): boolean {
-  if (listing.feedbackPct === null || listing.feedbackCount === null) return false;
-  return listing.feedbackPct >= watch.feedback && listing.feedbackCount >= watch.ratings;
+  if (listing.feedbackPct === null || listing.feedbackCount === null)
+    return false;
+  return (
+    listing.feedbackPct >= watch.feedback &&
+    listing.feedbackCount >= watch.ratings
+  );
 }
 
 function formatListing(listing: Listing): string {
   const lines = [`New eBay listing: ${listing.title}`];
   if (listing.price) lines.push(`Price: ${listing.price}`);
   if (listing.sellerFeedback) {
-    lines.push(listing.isSketchySeller
-      ? `WARNING - Seller: ${listing.sellerFeedback}`
-      : `Seller: ${listing.sellerFeedback}`);
+    lines.push(
+      listing.isSketchySeller
+        ? `WARNING - Seller: ${listing.sellerFeedback}`
+        : `Seller: ${listing.sellerFeedback}`,
+    );
   }
   lines.push(listing.url);
   return lines.join('\n');
@@ -148,20 +194,28 @@ export async function runEbaySearch(
   botToken: string,
 ): Promise<{ newCount: number }> {
   const url = buildEbayUrl(watch);
-  logger.info({ watchId: watch.id, keywords: watch.keywords }, 'Running eBay watch');
+  logger.info(
+    { watchId: watch.id, keywords: watch.keywords },
+    'Running eBay watch',
+  );
 
   // Fetch eBay
   let html: string;
   try {
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'User-Agent':
+          'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         'Accept-Language': 'en-AU,en;q=0.9',
-        Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        Accept:
+          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
     });
     if (!res.ok) {
-      logger.error({ watchId: watch.id, status: res.status }, 'eBay fetch failed');
+      logger.error(
+        { watchId: watch.id, status: res.status },
+        'eBay fetch failed',
+      );
       return { newCount: 0 };
     }
     html = await res.text();
@@ -173,15 +227,18 @@ export async function runEbaySearch(
   const filterAustralia = watch.location === 'au';
   const listings = parseListings(html, filterAustralia);
   const seenIds = getSeenIds(watch.id);
-  const newListings = listings.filter(l => !seenIds.has(l.id));
-  const qualified = newListings.filter(l => meetsSellerCriteria(l, watch));
+  const newListings = listings.filter((l) => !seenIds.has(l.id));
+  const qualified = newListings.filter((l) => meetsSellerCriteria(l, watch));
 
-  logger.info({
-    watchId: watch.id,
-    total: listings.length,
-    newRaw: newListings.length,
-    qualified: qualified.length,
-  }, 'eBay watch results');
+  logger.info(
+    {
+      watchId: watch.id,
+      total: listings.length,
+      newRaw: newListings.length,
+      qualified: qualified.length,
+    },
+    'eBay watch results',
+  );
 
   if (qualified.length > 0) {
     const threadId = await resolveThread(botToken, watch);
@@ -189,13 +246,20 @@ export async function runEbaySearch(
       const msg = formatListing(listing);
       await sendToThread(botToken, threadId, msg);
       if (watch.dm_enabled) {
-        await sendDm(botToken, watch.user_id, `eBay watch [${watch.id}] — new result:\n${msg}`);
+        await sendDm(
+          botToken,
+          watch.user_id,
+          `eBay watch [${watch.id}] — new result:\n${msg}`,
+        );
       }
     }
   }
 
   // Persist seen IDs (all listings, not just new ones)
-  markSeen(watch.id, listings.map(l => l.id));
+  markSeen(
+    watch.id,
+    listings.map((l) => l.id),
+  );
   markWatchRun(watch.id);
 
   // Check expiry

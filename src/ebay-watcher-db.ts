@@ -102,39 +102,57 @@ export function createWatch(params: CreateEbayWatch): EbayWatch {
   const db = getDb();
   const id = randomUUID().slice(0, 8);
   const now = new Date().toISOString();
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO ebay_watches (
       id, chat_jid, user_id, user_name, keywords, exclude,
       min_price, max_price, location, sort, every_mins,
       feedback, ratings, category, dm_enabled, expires_at, created_at
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).run(
-    id, params.chat_jid, params.user_id, params.user_name,
-    params.keywords, params.exclude ?? null,
-    params.min_price ?? null, params.max_price ?? null,
-    params.location ?? 'au', params.sort ?? 'new',
+  `,
+  ).run(
+    id,
+    params.chat_jid,
+    params.user_id,
+    params.user_name,
+    params.keywords,
+    params.exclude ?? null,
+    params.min_price ?? null,
+    params.max_price ?? null,
+    params.location ?? 'au',
+    params.sort ?? 'new',
     params.every_mins ?? 15,
-    params.feedback, params.ratings,
+    params.feedback,
+    params.ratings,
     params.category ?? null,
     params.dm_enabled !== false ? 1 : 0,
-    params.expires_at ?? null, now,
+    params.expires_at ?? null,
+    now,
   );
-  return db.prepare('SELECT * FROM ebay_watches WHERE id = ?').get(id) as EbayWatch;
+  return db
+    .prepare('SELECT * FROM ebay_watches WHERE id = ?')
+    .get(id) as EbayWatch;
 }
 
 export function getWatch(id: string): EbayWatch | undefined {
-  return getDb().prepare('SELECT * FROM ebay_watches WHERE id = ?').get(id) as EbayWatch | undefined;
+  return getDb().prepare('SELECT * FROM ebay_watches WHERE id = ?').get(id) as
+    | EbayWatch
+    | undefined;
 }
 
 export function listWatchesByUser(userId: string): EbayWatch[] {
   return getDb()
-    .prepare(`SELECT * FROM ebay_watches WHERE user_id = ? AND status != 'deleted' ORDER BY created_at DESC`)
+    .prepare(
+      `SELECT * FROM ebay_watches WHERE user_id = ? AND status != 'deleted' ORDER BY created_at DESC`,
+    )
     .all(userId) as EbayWatch[];
 }
 
 export function listAllActiveWatches(): EbayWatch[] {
   return getDb()
-    .prepare(`SELECT * FROM ebay_watches WHERE status = 'active' ORDER BY created_at DESC`)
+    .prepare(
+      `SELECT * FROM ebay_watches WHERE status = 'active' ORDER BY created_at DESC`,
+    )
     .all() as EbayWatch[];
 }
 
@@ -144,15 +162,20 @@ export function getDueWatches(): EbayWatch[] {
   const all = db
     .prepare(`SELECT * FROM ebay_watches WHERE status = 'active'`)
     .all() as EbayWatch[];
-  return all.filter(w => {
+  return all.filter((w) => {
     if (!w.last_run_at) return true; // never run → run now
     const elapsed = (now.getTime() - new Date(w.last_run_at).getTime()) / 60000;
     return elapsed >= w.every_mins;
   });
 }
 
-export function setWatchStatus(id: string, status: 'active' | 'paused' | 'deleted'): void {
-  getDb().prepare('UPDATE ebay_watches SET status = ? WHERE id = ?').run(status, id);
+export function setWatchStatus(
+  id: string,
+  status: 'active' | 'paused' | 'deleted',
+): void {
+  getDb()
+    .prepare('UPDATE ebay_watches SET status = ? WHERE id = ?')
+    .run(status, id);
 }
 
 export function markWatchRun(id: string): void {
@@ -165,7 +188,7 @@ export function getSeenIds(watchId: string): Set<string> {
   const rows = getDb()
     .prepare('SELECT listing_id FROM ebay_watch_seen WHERE watch_id = ?')
     .all(watchId) as Array<{ listing_id: string }>;
-  return new Set(rows.map(r => r.listing_id));
+  return new Set(rows.map((r) => r.listing_id));
 }
 
 export function markSeen(watchId: string, ids: string[]): void {
@@ -174,20 +197,33 @@ export function markSeen(watchId: string, ids: string[]): void {
     'INSERT OR IGNORE INTO ebay_watch_seen (watch_id, listing_id, seen_at) VALUES (?, ?, ?)',
   );
   const now = new Date().toISOString();
-  const insert = db.transaction(() => ids.forEach(id => stmt.run(watchId, id, now)));
+  const insert = db.transaction(() =>
+    ids.forEach((id) => stmt.run(watchId, id, now)),
+  );
   insert();
 }
 
-export function getThread(watchId: string, chatJid: string): string | undefined {
+export function getThread(
+  watchId: string,
+  chatJid: string,
+): string | undefined {
   const row = getDb()
-    .prepare('SELECT thread_id FROM ebay_watch_threads WHERE watch_id = ? AND chat_jid = ?')
+    .prepare(
+      'SELECT thread_id FROM ebay_watch_threads WHERE watch_id = ? AND chat_jid = ?',
+    )
     .get(watchId, chatJid) as { thread_id: string } | undefined;
   return row?.thread_id;
 }
 
-export function setThread(watchId: string, chatJid: string, threadId: string): void {
+export function setThread(
+  watchId: string,
+  chatJid: string,
+  threadId: string,
+): void {
   getDb()
-    .prepare('INSERT OR REPLACE INTO ebay_watch_threads (watch_id, chat_jid, thread_id) VALUES (?, ?, ?)')
+    .prepare(
+      'INSERT OR REPLACE INTO ebay_watch_threads (watch_id, chat_jid, thread_id) VALUES (?, ?, ?)',
+    )
     .run(watchId, chatJid, threadId);
 }
 
@@ -201,8 +237,11 @@ export function buildEbayUrl(watch: EbayWatch): string {
       nkw += ` -${excl}`;
     } else {
       // Comma-separated: dell,optiplex → -dell -optiplex
-      const terms = excl.split(',').map(t => t.trim()).filter(Boolean);
-      nkw += ' ' + terms.map(t => `-${t}`).join(' ');
+      const terms = excl
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      nkw += ' ' + terms.map((t) => `-${t}`).join(' ');
     }
   }
 

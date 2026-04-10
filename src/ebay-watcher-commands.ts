@@ -21,7 +21,8 @@ import { logger } from './logger.js';
 
 // ── Command token parser ───────────────────────────────────────────────────────
 
-const FLAG_RE = /^(min|max|loc|sort|every|feedback|ratings|exclude|cat|dm|expires):/i;
+const FLAG_RE =
+  /^(min|max|loc|sort|every|feedback|ratings|exclude|cat|dm|expires):/i;
 
 interface ParsedArgs {
   keywords: string;
@@ -44,7 +45,9 @@ function parseArgs(input: string): ParsedArgs {
   const flags: Record<string, string> = {};
 
   for (const token of tokens) {
-    const m = token.match(/^(min|max|loc|sort|every|feedback|ratings|exclude|cat|dm|expires):(.*)$/i);
+    const m = token.match(
+      /^(min|max|loc|sort|every|feedback|ratings|exclude|cat|dm|expires):(.*)$/i,
+    );
     if (m) {
       flags[m[1].toLowerCase()] = m[2];
     } else {
@@ -60,11 +63,14 @@ function parseArgs(input: string): ParsedArgs {
     loc: flags.loc?.toLowerCase(),
     sort: flags.sort?.toLowerCase(),
     every: flags.every !== undefined ? parseInt(flags.every, 10) : undefined,
-    feedback: flags.feedback !== undefined ? parseInt(flags.feedback, 10) : undefined,
-    ratings: flags.ratings !== undefined ? parseInt(flags.ratings, 10) : undefined,
+    feedback:
+      flags.feedback !== undefined ? parseInt(flags.feedback, 10) : undefined,
+    ratings:
+      flags.ratings !== undefined ? parseInt(flags.ratings, 10) : undefined,
     cat: flags.cat,
     dm: flags.dm !== undefined ? flags.dm.toLowerCase() !== 'off' : undefined,
-    expires: flags.expires !== undefined ? parseInt(flags.expires, 10) : undefined,
+    expires:
+      flags.expires !== undefined ? parseInt(flags.expires, 10) : undefined,
   };
 }
 
@@ -72,15 +78,20 @@ function parseArgs(input: string): ParsedArgs {
 
 function watchSummary(w: EbayWatch): string {
   const lines: string[] = [];
-  lines.push(`**[${w.id}]** ${w.keywords}${w.exclude ? ` | Exclude: ${w.exclude}` : ''}`);
+  lines.push(
+    `**[${w.id}]** ${w.keywords}${w.exclude ? ` | Exclude: ${w.exclude}` : ''}`,
+  );
 
-  const priceStr = w.min_price !== null || w.max_price !== null
-    ? `$${w.min_price ?? '0'} – $${w.max_price ?? 'any'}`
-    : 'any price';
+  const priceStr =
+    w.min_price !== null || w.max_price !== null
+      ? `$${w.min_price ?? '0'} – $${w.max_price ?? 'any'}`
+      : 'any price';
   const locStr = w.location === 'au' ? 'Australia' : 'Worldwide';
   const sortStr = w.sort === 'cheap' ? 'Cheapest first' : 'Newly listed';
   lines.push(`${priceStr} | ${locStr} | ${sortStr} | Every ${w.every_mins}min`);
-  lines.push(`Feedback: ≥${w.feedback}% / ${w.ratings}+ ratings | Status: ${w.status}`);
+  lines.push(
+    `Feedback: ≥${w.feedback}% / ${w.ratings}+ ratings | Status: ${w.status}`,
+  );
   if (w.status !== 'deleted') {
     const thread = getWatchThread(w);
     if (thread) lines.push(`Thread: <#${thread}>`);
@@ -127,26 +138,31 @@ const HELP_TEXT = `**eBay Watcher Commands**
 /**
  * Handle an !ebay command. Returns true if the message was consumed.
  */
-export async function handleEbayCommand(message: Message, content: string): Promise<boolean> {
+export async function handleEbayCommand(
+  message: Message,
+  content: string,
+): Promise<boolean> {
   if (!content.trimStart().toLowerCase().startsWith('!ebay')) return false;
 
   const parts = content.trim().split(/\s+/);
   const sub = parts[1]?.toLowerCase() ?? '';
   const rest = parts.slice(2).join(' ');
   const userId = message.author.id;
-  const userName = message.member?.displayName || message.author.displayName || message.author.username;
+  const userName =
+    message.member?.displayName ||
+    message.author.displayName ||
+    message.author.username;
   const chatJid = `dc:${message.channelId}`;
 
   try {
     switch (sub) {
-
       // ── !ebay add ────────────────────────────────────────────────────────────
       case 'add': {
         if (!rest.trim()) {
           await message.reply(
             'Usage: `!ebay add <keywords> [options]`\n' +
-            'Example: `!ebay add RTX (3090,4090) min:200 max:1900 feedback:90 ratings:50`\n\n' +
-            'Type `!ebay help` for all options.',
+              'Example: `!ebay add RTX (3090,4090) min:200 max:1900 feedback:90 ratings:50`\n\n' +
+              'Type `!ebay help` for all options.',
           );
           return true;
         }
@@ -156,16 +172,22 @@ export async function handleEbayCommand(message: Message, content: string): Prom
         // Validate required params
         const missing: string[] = [];
         if (!args.keywords) missing.push('`keywords` (the search terms)');
-        if (args.feedback === undefined) missing.push('`feedback:<percentage>` — minimum seller feedback %, e.g. `feedback:90`');
-        if (args.ratings === undefined) missing.push('`ratings:<count>` — minimum seller rating count, e.g. `ratings:50`');
+        if (args.feedback === undefined)
+          missing.push(
+            '`feedback:<percentage>` — minimum seller feedback %, e.g. `feedback:90`',
+          );
+        if (args.ratings === undefined)
+          missing.push(
+            '`ratings:<count>` — minimum seller rating count, e.g. `ratings:50`',
+          );
 
         if (missing.length > 0) {
           const kw = args.keywords || 'RTX 3090';
           const example = `!ebay add ${kw} feedback:90 ratings:50${args.min !== undefined ? ` min:${args.min}` : ''}${args.max !== undefined ? ` max:${args.max}` : ''}`;
           await message.reply(
             `Missing required parameter${missing.length > 1 ? 's' : ''}:\n` +
-            missing.map(m => `  - ${m}`).join('\n') +
-            `\n\nExample: \`${example}\``,
+              missing.map((m) => `  - ${m}`).join('\n') +
+              `\n\nExample: \`${example}\``,
           );
           return true;
         }
@@ -181,7 +203,9 @@ export async function handleEbayCommand(message: Message, content: string): Prom
 
         let expiresAt: string | undefined;
         if (args.expires !== undefined && args.expires > 0) {
-          expiresAt = new Date(Date.now() + args.expires * 3600 * 1000).toISOString();
+          expiresAt = new Date(
+            Date.now() + args.expires * 3600 * 1000,
+          ).toISOString();
         }
 
         const watch = createWatch({
@@ -203,9 +227,10 @@ export async function handleEbayCommand(message: Message, content: string): Prom
         });
 
         const previewUrl = buildEbayUrl(watch);
-        const priceStr = watch.min_price !== null || watch.max_price !== null
-          ? `$${watch.min_price ?? '0'} – $${watch.max_price ?? 'any'}`
-          : 'any price';
+        const priceStr =
+          watch.min_price !== null || watch.max_price !== null
+            ? `$${watch.min_price ?? '0'} – $${watch.max_price ?? 'any'}`
+            : 'any price';
 
         // Create the thread immediately
         let threadMention = '';
@@ -219,28 +244,34 @@ export async function handleEbayCommand(message: Message, content: string): Prom
           setThread(watch.id, watch.chat_jid, thread.id);
           await thread.send(
             `**eBay Watch [${watch.id}]** — ${watch.keywords}\n` +
-            `Price: ${priceStr} | ${watch.location === 'au' ? 'Australia' : 'Worldwide'} | ${watch.sort === 'cheap' ? 'Cheapest first' : 'Newly listed'}\n` +
-            `Feedback: ≥${watch.feedback}% with ${watch.ratings}+ ratings | Every ${watch.every_mins} minutes\n` +
-            `Search URL: ${previewUrl}`,
+              `Price: ${priceStr} | ${watch.location === 'au' ? 'Australia' : 'Worldwide'} | ${watch.sort === 'cheap' ? 'Cheapest first' : 'Newly listed'}\n` +
+              `Feedback: ≥${watch.feedback}% with ${watch.ratings}+ ratings | Every ${watch.every_mins} minutes\n` +
+              `Search URL: ${previewUrl}`,
           );
           threadMention = ` Thread: <#${thread.id}>`;
         } catch (err) {
-          logger.warn({ err, watchId: watch.id }, 'Failed to create eBay watch thread');
+          logger.warn(
+            { err, watchId: watch.id },
+            'Failed to create eBay watch thread',
+          );
         }
 
         await message.reply(
           `Search created — ID: \`${watch.id}\`\n` +
-          `Keywords: ${watch.keywords}${watch.exclude ? ` | Exclude: ${watch.exclude}` : ''}\n` +
-          `Price: ${priceStr} | ${watch.location === 'au' ? 'Australia' : 'Worldwide'} | ${watch.sort === 'cheap' ? 'Cheapest first' : 'Newly listed'}\n` +
-          `Feedback: ≥${watch.feedback}% with ${watch.ratings}+ ratings | Every ${watch.every_mins} minutes\n` +
-          (expiresAt ? `Expires: ${new Date(expiresAt).toLocaleString('en-AU')}\n` : '') +
-          threadMention,
+            `Keywords: ${watch.keywords}${watch.exclude ? ` | Exclude: ${watch.exclude}` : ''}\n` +
+            `Price: ${priceStr} | ${watch.location === 'au' ? 'Australia' : 'Worldwide'} | ${watch.sort === 'cheap' ? 'Cheapest first' : 'Newly listed'}\n` +
+            `Feedback: ≥${watch.feedback}% with ${watch.ratings}+ ratings | Every ${watch.every_mins} minutes\n` +
+            (expiresAt
+              ? `Expires: ${new Date(expiresAt).toLocaleString('en-AU')}\n`
+              : '') +
+            threadMention,
         );
 
         // Run an immediate search and post results to the thread
         try {
           const secrets = readEnvFile(['DISCORD_BOT_TOKEN']);
-          const token = process.env.DISCORD_BOT_TOKEN || secrets.DISCORD_BOT_TOKEN || '';
+          const token =
+            process.env.DISCORD_BOT_TOKEN || secrets.DISCORD_BOT_TOKEN || '';
           const result = await runEbaySearch(watch, token);
           if (result.newCount === 0) {
             // Post "no results" to the thread so it's not silent
@@ -249,23 +280,32 @@ export async function handleEbayCommand(message: Message, content: string): Prom
               try {
                 const ch = await message.client.channels.fetch(threadId);
                 if (ch && 'send' in ch) {
-                  await (ch as TextChannel).send(`No listings found matching your criteria right now. Will check again every ${watch.every_mins} minutes.`);
+                  await (ch as TextChannel).send(
+                    `No listings found matching your criteria right now. Will check again every ${watch.every_mins} minutes.`,
+                  );
                 }
-              } catch { /* non-fatal */ }
+              } catch {
+                /* non-fatal */
+              }
             }
           }
         } catch (err) {
           logger.warn({ err, watchId: watch.id }, 'Initial eBay search failed');
         }
 
-        logger.info({ watchId: watch.id, userId, keywords: watch.keywords }, 'eBay watch created');
+        logger.info(
+          { watchId: watch.id, userId, keywords: watch.keywords },
+          'eBay watch created',
+        );
         return true;
       }
 
       // ── !ebay list ───────────────────────────────────────────────────────────
       case 'list': {
         const showAll = rest.trim().toLowerCase() === 'all';
-        const watches = showAll ? listAllActiveWatches() : listWatchesByUser(userId);
+        const watches = showAll
+          ? listAllActiveWatches()
+          : listWatchesByUser(userId);
 
         if (watches.length === 0) {
           await message.reply(
@@ -283,7 +323,10 @@ export async function handleEbayCommand(message: Message, content: string): Prom
         // Post in chunks of 5 to stay under Discord's 2000-char limit
         await message.reply(header);
         for (let i = 0; i < watches.length; i += 3) {
-          const chunk = watches.slice(i, i + 3).map(watchSummary).join('\n\n');
+          const chunk = watches
+            .slice(i, i + 3)
+            .map(watchSummary)
+            .join('\n\n');
           await message.reply(chunk);
         }
         return true;
@@ -292,10 +335,19 @@ export async function handleEbayCommand(message: Message, content: string): Prom
       // ── !ebay stop ───────────────────────────────────────────────────────────
       case 'stop': {
         const id = rest.trim();
-        if (!id) { await message.reply('Usage: `!ebay stop <id>`'); return true; }
+        if (!id) {
+          await message.reply('Usage: `!ebay stop <id>`');
+          return true;
+        }
         const watch = getWatch(id);
-        if (!watch) { await message.reply(`Search \`${id}\` not found.`); return true; }
-        if (watch.user_id !== userId) { await message.reply('You can only stop your own searches.'); return true; }
+        if (!watch) {
+          await message.reply(`Search \`${id}\` not found.`);
+          return true;
+        }
+        if (watch.user_id !== userId) {
+          await message.reply('You can only stop your own searches.');
+          return true;
+        }
         setWatchStatus(id, 'deleted');
         await message.reply(`Search \`${id}\` stopped.`);
         return true;
@@ -304,24 +356,50 @@ export async function handleEbayCommand(message: Message, content: string): Prom
       // ── !ebay pause ──────────────────────────────────────────────────────────
       case 'pause': {
         const id = rest.trim();
-        if (!id) { await message.reply('Usage: `!ebay pause <id>`'); return true; }
+        if (!id) {
+          await message.reply('Usage: `!ebay pause <id>`');
+          return true;
+        }
         const watch = getWatch(id);
-        if (!watch) { await message.reply(`Search \`${id}\` not found.`); return true; }
-        if (watch.user_id !== userId) { await message.reply('You can only pause your own searches.'); return true; }
-        if (watch.status === 'paused') { await message.reply(`Search \`${id}\` is already paused.`); return true; }
+        if (!watch) {
+          await message.reply(`Search \`${id}\` not found.`);
+          return true;
+        }
+        if (watch.user_id !== userId) {
+          await message.reply('You can only pause your own searches.');
+          return true;
+        }
+        if (watch.status === 'paused') {
+          await message.reply(`Search \`${id}\` is already paused.`);
+          return true;
+        }
         setWatchStatus(id, 'paused');
-        await message.reply(`Search \`${id}\` paused. Use \`!ebay resume ${id}\` to resume.`);
+        await message.reply(
+          `Search \`${id}\` paused. Use \`!ebay resume ${id}\` to resume.`,
+        );
         return true;
       }
 
       // ── !ebay resume ─────────────────────────────────────────────────────────
       case 'resume': {
         const id = rest.trim();
-        if (!id) { await message.reply('Usage: `!ebay resume <id>`'); return true; }
+        if (!id) {
+          await message.reply('Usage: `!ebay resume <id>`');
+          return true;
+        }
         const watch = getWatch(id);
-        if (!watch) { await message.reply(`Search \`${id}\` not found.`); return true; }
-        if (watch.user_id !== userId) { await message.reply('You can only resume your own searches.'); return true; }
-        if (watch.status === 'active') { await message.reply(`Search \`${id}\` is already active.`); return true; }
+        if (!watch) {
+          await message.reply(`Search \`${id}\` not found.`);
+          return true;
+        }
+        if (watch.user_id !== userId) {
+          await message.reply('You can only resume your own searches.');
+          return true;
+        }
+        if (watch.status === 'active') {
+          await message.reply(`Search \`${id}\` is already active.`);
+          return true;
+        }
         setWatchStatus(id, 'active');
         await message.reply(`Search \`${id}\` resumed.`);
         return true;
@@ -330,21 +408,35 @@ export async function handleEbayCommand(message: Message, content: string): Prom
       // ── !ebay test ───────────────────────────────────────────────────────────
       case 'test': {
         const id = rest.trim();
-        if (!id) { await message.reply('Usage: `!ebay test <id>`'); return true; }
+        if (!id) {
+          await message.reply('Usage: `!ebay test <id>`');
+          return true;
+        }
         const watch = getWatch(id);
-        if (!watch) { await message.reply(`Search \`${id}\` not found.`); return true; }
-        if (watch.user_id !== userId) { await message.reply('You can only test your own searches.'); return true; }
+        if (!watch) {
+          await message.reply(`Search \`${id}\` not found.`);
+          return true;
+        }
+        if (watch.user_id !== userId) {
+          await message.reply('You can only test your own searches.');
+          return true;
+        }
 
         await message.reply(`Running search \`${id}\` now...`);
 
         const secrets = readEnvFile(['DISCORD_BOT_TOKEN']);
-        const token = process.env.DISCORD_BOT_TOKEN || secrets.DISCORD_BOT_TOKEN || '';
+        const token =
+          process.env.DISCORD_BOT_TOKEN || secrets.DISCORD_BOT_TOKEN || '';
 
         const result = await runEbaySearch(watch, token);
         if (result.newCount === 0) {
-          await message.reply(`Search \`${id}\`: no new listings found (or first run — seeding seen IDs).`);
+          await message.reply(
+            `Search \`${id}\`: no new listings found (or first run — seeding seen IDs).`,
+          );
         } else {
-          await message.reply(`Search \`${id}\`: found ${result.newCount} new listing(s). Check the thread.`);
+          await message.reply(
+            `Search \`${id}\`: found ${result.newCount} new listing(s). Check the thread.`,
+          );
         }
         return true;
       }

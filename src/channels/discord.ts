@@ -154,7 +154,7 @@ export class DiscordChannel implements Channel {
 
       // Intercept !ebay watcher commands before passing to agent
       if (content.trimStart().toLowerCase().startsWith('!ebay')) {
-        handleEbayCommand(message, content.trim()).catch(err =>
+        handleEbayCommand(message, content.trim()).catch((err) =>
           logger.error({ err }, 'eBay command handler error'),
         );
         return;
