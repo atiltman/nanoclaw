@@ -3,7 +3,7 @@
  * Intercepts !ebay commands in Discord before routing to the agent.
  */
 
-import { ChannelType, Message, TextChannel } from 'discord.js';
+import { ChannelType, Message, TextChannel, ThreadChannel } from 'discord.js';
 import { runEbaySearch } from './ebay-watcher-runner.js';
 import { readEnvFile } from './env.js';
 import {
@@ -349,6 +349,18 @@ export async function handleEbayCommand(
         }
         setWatchStatus(id, 'deleted');
         await message.reply(`Search \`${id}\` stopped.`);
+
+        // Archive the thread
+        const threadId = getThread(id, watch.chat_jid);
+        if (threadId) {
+          try {
+            const ch = await message.client.channels.fetch(threadId);
+            if (ch instanceof ThreadChannel) await ch.setArchived(true);
+          } catch {
+            // non-fatal
+          }
+        }
+
         return true;
       }
 
