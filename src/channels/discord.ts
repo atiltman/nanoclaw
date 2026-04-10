@@ -18,6 +18,16 @@ import {
 } from '../types.js';
 import { handleEbayCommand } from '../ebay-watcher-commands.js';
 
+// Returns true if the message author has the named Discord role (case-insensitive).
+// Always returns false in DMs (no guild = no roles).
+function memberHasRole(message: Message, roleName: string): boolean {
+  return (
+    message.member?.roles.cache.some(
+      (r) => r.name.toLowerCase() === roleName.toLowerCase(),
+    ) ?? false
+  );
+}
+
 export interface DiscordChannelOpts {
   onMessage: OnInboundMessage;
   onChatMetadata: OnChatMetadata;
@@ -154,10 +164,26 @@ export class DiscordChannel implements Channel {
 
       // Intercept !ebay watcher commands before passing to agent
       if (content.trimStart().toLowerCase().startsWith('!ebay')) {
+        if (!memberHasRole(message, 'ebay')) {
+          message
+            .reply('This command requires the `ebay` role.')
+            .catch(() => {});
+          return;
+        }
         handleEbayCommand(message, content.trim()).catch((err) =>
           logger.error({ err }, 'eBay command handler error'),
         );
         return;
+      }
+
+      // Restrict !claude / /claude to the 'claude' role
+      if (/^[!/]claude\b/i.test(content.trimStart())) {
+        if (!memberHasRole(message, 'claude')) {
+          message
+            .reply('This command requires the `claude` role.')
+            .catch(() => {});
+          return;
+        }
       }
 
       // Deliver message — startMessageLoop() will pick it up
