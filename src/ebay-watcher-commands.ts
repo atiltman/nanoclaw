@@ -161,7 +161,7 @@ export async function handleEbayCommand(
         if (!rest.trim()) {
           await message.reply(
             'Usage: `!ebay add <keywords> [options]`\n' +
-              'Example: `!ebay add RTX (3090,4090) min:200 max:1900 feedback:90 ratings:50`\n\n' +
+              'Example: `!ebay add RTX (3090,4090) min:200 max:1900 ratings:50`\n\n' +
               'Type `!ebay help` for all options.',
           );
           return true;
@@ -192,7 +192,10 @@ export async function handleEbayCommand(
           await message.reply('`every` must be between 5 and 1440 minutes.');
           return true;
         }
-        if (args.feedback !== undefined && (args.feedback < 0 || args.feedback > 100)) {
+        if (
+          args.feedback !== undefined &&
+          (args.feedback < 0 || args.feedback > 100)
+        ) {
           await message.reply('`feedback` must be between 0 and 100.');
           return true;
         }
