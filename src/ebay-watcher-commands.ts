@@ -119,9 +119,9 @@ const HELP_TEXT = `**eBay Watcher Commands**
 \`!ebay test <id>\` — Run a search immediately
 \`!ebay help\` — Show this help
 
-**Options for \`!ebay add\`** (feedback and ratings are required):
+**Options for \`!ebay add\`** (ratings is required):
 \`min:<price>\` \`max:<price>\` — Price range in AU$
-\`feedback:<pct>\` — Minimum seller feedback percentage
+\`feedback:<pct>\` — Minimum seller feedback percentage (default: 95%)
 \`ratings:<count>\` — Minimum seller rating count
 \`exclude:<terms>\` — e.g. \`exclude:dell,optiplex\` or \`exclude:(dell,optiplex)\`
 \`loc:worldwide\` — Search worldwide (default: Australia)
@@ -172,10 +172,6 @@ export async function handleEbayCommand(
         // Validate required params
         const missing: string[] = [];
         if (!args.keywords) missing.push('`keywords` (the search terms)');
-        if (args.feedback === undefined)
-          missing.push(
-            '`feedback:<percentage>` — minimum seller feedback %, e.g. `feedback:90`',
-          );
         if (args.ratings === undefined)
           missing.push(
             '`ratings:<count>` — minimum seller rating count, e.g. `ratings:50`',
@@ -183,7 +179,7 @@ export async function handleEbayCommand(
 
         if (missing.length > 0) {
           const kw = args.keywords || 'RTX 3090';
-          const example = `!ebay add ${kw} feedback:90 ratings:50${args.min !== undefined ? ` min:${args.min}` : ''}${args.max !== undefined ? ` max:${args.max}` : ''}`;
+          const example = `!ebay add ${kw} ratings:50${args.min !== undefined ? ` min:${args.min}` : ''}${args.max !== undefined ? ` max:${args.max}` : ''}`;
           await message.reply(
             `Missing required parameter${missing.length > 1 ? 's' : ''}:\n` +
               missing.map((m) => `  - ${m}`).join('\n') +
@@ -196,7 +192,7 @@ export async function handleEbayCommand(
           await message.reply('`every` must be between 5 and 1440 minutes.');
           return true;
         }
-        if (args.feedback! < 0 || args.feedback! > 100) {
+        if (args.feedback !== undefined && (args.feedback < 0 || args.feedback > 100)) {
           await message.reply('`feedback` must be between 0 and 100.');
           return true;
         }
@@ -219,7 +215,7 @@ export async function handleEbayCommand(
           location: args.loc === 'worldwide' ? 'worldwide' : 'au',
           sort: args.sort === 'cheap' ? 'cheap' : 'new',
           every_mins: args.every ?? 15,
-          feedback: args.feedback!,
+          feedback: args.feedback ?? 95,
           ratings: args.ratings!,
           category: args.cat,
           dm_enabled: args.dm !== false,
