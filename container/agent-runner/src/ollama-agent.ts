@@ -178,11 +178,8 @@ export async function runOllamaAgent(
   log(`Tools available: ${toolRegistry.map(t => t.name).join(', ')}`);
 
   // ── Agentic loop ───────────────────────────────────────────────────────────
-  const now = new Date();
-  const nowStr = now.toLocaleString('en-AU', { timeZone: process.env.TZ || 'Australia/Melbourne', dateStyle: 'full', timeStyle: 'long' });
   const systemParts = [
     'You are a helpful assistant based in Melbourne, Australia.',
-    `The current date and time is ${nowStr}. When asked about the current date or time, always use this value — never say you do not have access to the current time.`,
     'You have access to tools — use them proactively to give accurate, up-to-date answers.',
   ];
   if (braveClient) {
@@ -198,7 +195,7 @@ export async function runOllamaAgent(
   const messages: OllamaMessage[] = [
     { role: 'system', content: systemParts.join(' ') },
     ...history,
-    { role: 'user', content: `[${nowStr}] ${userText}` },
+    { role: 'user', content: userText },
   ];
   let finalAnswer = '';
 

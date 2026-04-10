@@ -16,6 +16,7 @@ import {
   OnInboundMessage,
   RegisteredGroup,
 } from '../types.js';
+import { handleEbayCommand } from '../ebay-watcher-commands.js';
 
 export interface DiscordChannelOpts {
   onMessage: OnInboundMessage;
@@ -147,6 +148,14 @@ export class DiscordChannel implements Channel {
         logger.debug(
           { chatJid, chatName },
           'Message from unregistered Discord channel',
+        );
+        return;
+      }
+
+      // Intercept !ebay watcher commands before passing to agent
+      if (content.trimStart().toLowerCase().startsWith('!ebay')) {
+        handleEbayCommand(message, content.trim()).catch(err =>
+          logger.error({ err }, 'eBay command handler error'),
         );
         return;
       }

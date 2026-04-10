@@ -118,6 +118,7 @@ const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
 const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
 
 let activePrefix = '';
+const ollamaModelLabel = `[${(process.env.OLLAMA_MODEL || 'ollama').split(':')[0]}]: `;
 
 function writeOutput(output: ContainerOutput): void {
   const prefixed = activePrefix && output.result
@@ -763,7 +764,7 @@ async function main(): Promise<void> {
       }
 
       log('Routing to Ollama (default)');
-      activePrefix = '🤖 **Ollama:**\n';
+      activePrefix = ollamaModelLabel;
       try {
         const { runOllamaAgent } = await import('./ollama-agent.js');
         const ollamaPrompt = formatPromptForOllama(prompt);
@@ -844,7 +845,7 @@ async function main(): Promise<void> {
             writeOutput({ status: 'success', result: cmdReply2, newSessionId: sessionId });
           } else {
             log('IPC message: routing to Ollama');
-            activePrefix = '🤖 **Ollama:**\n';
+            activePrefix = ollamaModelLabel;
             try {
               const { runOllamaAgent } = await import('./ollama-agent.js');
               const ollamaPrompt = formatPromptForOllama(nextMessage);
